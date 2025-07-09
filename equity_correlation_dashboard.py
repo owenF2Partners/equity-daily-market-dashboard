@@ -4,48 +4,80 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# App title
+# ------------------------------
+# Title & Config
+# ------------------------------
 st.title("Equity Market Dashboard - Sector Correlation")
 
-# Tickers and labels
+st.write("Select number of years of data:")
+
+years = st.selectbox(
+    "Years of historical data:",
+    options=[1, 5, 10],
+    index=0
+)
+
+# ------------------------------
+# Define tickers
+# ------------------------------
 tickers = {
-    'communication_services': 'XLC',
-    'consumer_discretionary': 'XLY',
-    'consumer_staples': 'XLP',
-    'energy': 'XLE',
-    'financials': 'XLF',
-    'health_care': 'XLV',
-    'industrials': 'XLI',
-    'information_technology': 'XLK',
-    'materials': 'XLB',
-    'real_estate': 'XLRE',
-    'utilities': 'XLU',
-    'spx': '^GSPC'
+    "communication_services": "XLC",
+    "consumer_discretionary": "XLY",
+    "consumer_staples": "XLP",
+    "energy": "XLE",
+    "financials": "XLF",
+    "health_care": "XLV",
+    "industrials": "XLI",
+    "information_technology": "XLK",
+    "materials": "XLB",
+    "real_estate": "XLRE",
+    "utilities": "XLU",
+    "spx": "^GSPC"
 }
 
-years = st.selectbox("Select number of years of data:", [1, 3, 5], index=1)
-
-# Download data
+start = pd.Timestamp.today() - pd.DateOffset(years=years)
 end = pd.Timestamp.today()
-start = end - pd.DateOffset(years=years)
 
-data = yf.download(list(tickers.values()), start=start, end=end, group_by='ticker')
+# ------------------------------
+# Download Data
+# ------------------------------
+st.write(f"Fetching data for the last {years} years...")
+data = yf.download(list(tickers.values()), start=start, end=end, group_by='ticker', auto_adjust=False)
 
+# Build adjusted close dataframe
 adj_close = pd.DataFrame()
 for ticker in tickers.values():
-    if ('Adj Close' in data[ticker].columns):
+    try:
         adj_close[ticker] = data[ticker]['Adj Close']
-        
-returns = data.pct_change().dropna()
-returns.columns = list(tickers.keys())
+    except Exception as e:
+        st.warning(f"No data for ticker: {ticker}")
 
-# Correlation matrix
+# Drop rows with any missing values
+adj_close = adj_close.dropna()
+
+if adj_close.empty:
+    st.error("No data available for the selected period.")
+    st.stop()
+
+# ------------------------------
+# Compute returns
+# ------------------------------
+returns = adj_close.pct_change().dropna()
+
+# Rename columns to sector names
+col_map = {v: k for k, v in tickers.items() if v in returns.columns}
+returns.rename(columns=col_map, inplace=True)
+
+# ------------------------------
+# Compute Correlation
+# ------------------------------
 corr = returns.corr()
 
-# Plot
-fig, ax = plt.subplots(figsize=(10,8))
-sns.heatmap(corr, annot=True, cmap='RdBu_r', center=0, ax=ax)
-plt.title("Correlation Matrix of S&P Sectors", fontsize=14)
-plt.tight_layout()
-
+# ------------------------------
+# Plot Correlation Heatmap
+# ------------------------------
+st.subheader("Correlation matrix of S&P sectors")
+fig, ax = plt.subplots(figsize=(10, 8))
+sns.heatmap(corr, annot=True, cmap='coolwarm', vmin=-1, vmax=1, ax=ax)
+plt.title("Correlation matrix of S&P sectors")
 st.pyplot(fig)
