@@ -29,7 +29,13 @@ years = st.selectbox("Select number of years of data:", [1, 3, 5], index=1)
 end = pd.Timestamp.today()
 start = end - pd.DateOffset(years=years)
 
-data = yf.download(list(tickers.values()), start=start, end=end)['Adj Close']
+data = yf.download(list(tickers.values()), start=start, end=end, group_by='ticker')
+
+adj_close = pd.DataFrame()
+for ticker in tickers.values():
+    if ('Adj Close' in data[ticker].columns):
+        adj_close[ticker] = data[ticker]['Adj Close']
+        
 returns = data.pct_change().dropna()
 returns.columns = list(tickers.keys())
 
